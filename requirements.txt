@@ -4,3 +4,4 @@ langchain
 langchain-chroma
 langchain-google-genai
 langchain-core
+protobuf==4.25.3
