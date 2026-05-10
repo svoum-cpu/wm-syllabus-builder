@@ -8,7 +8,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from generate_policy import PROMPT_TEMPLATE 
 
 # 1. Page Config
-st.set_page_config(page_title="W&M AI Policy Architect", page_icon="🛡️", layout="centered") # 'centered' helps readability
+st.set_page_config(page_title="W&M AI Policy Architect", page_icon="🛡️", layout="centered")
+
+# --- INITIALIZE SESSION STATE ---
+# This keeps your history alive during the session
+if "history" not in st.session_state:
+    st.session_state.history = []
 
 # 2. W&M Brand Identity & Styling
 WM_GREEN = "#115740"
@@ -17,10 +22,7 @@ WM_GOLD = "#B9975B"
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Inter:wght@300;400;600&display=swap');
-    
     .stApp {{ background-color: #FFFFFF; }}
-    
-    /* Hero Header */
     .hero {{
         background: {WM_GREEN};
         padding: 4rem 2rem;
@@ -30,10 +32,7 @@ st.markdown(f"""
         margin-bottom: 3rem;
         border-bottom: 8px solid {WM_GOLD};
     }}
-    
     .hero h1 {{ font-family: 'Libre Baskerville', serif; font-size: 3rem; color: white; }}
-    
-    /* Section Headers */
     .section-header {{
         font-family: 'Libre Baskerville', serif;
         color: {WM_GREEN};
@@ -42,16 +41,12 @@ st.markdown(f"""
         margin-top: 2rem;
         margin-bottom: 1.5rem;
     }}
-
-    /* Make Text Areas actually big and readable */
     .stTextArea textarea {{
         font-size: 1.1rem !important;
         line-height: 1.5 !important;
         border-radius: 10px !important;
         border: 1px solid #CCC !important;
     }}
-
-    /* Policy Memo Container */
     .policy-memo {{
         background-color: #fcfcfc;
         padding: 4rem;
@@ -61,8 +56,6 @@ st.markdown(f"""
         border-top: 12px solid {WM_GOLD};
         margin-top: 3rem;
     }}
-
-    /* The 'Generate' Button */
     .stButton>button {{
         width: 100%;
         height: 4rem;
@@ -84,13 +77,23 @@ st.markdown(f"""
 
 load_dotenv()
 
+# --- SIDEBAR (Rendered early so it stays visible) ---
+with st.sidebar:
+    st.markdown("### 📜 Session History")
+    if not st.session_state.history:
+        st.info("No policies generated yet.")
+    else:
+        for idx, item in enumerate(reversed(st.session_state.history)):
+            with st.expander(f"{item['time']} - {item['name']}"):
+                st.write(item['content'][:200] + "...")
+                st.download_button("Download This", item['content'], file_name=f"WM_{item['name']}.txt", key=f"dl_{idx}")
+
 # --- HERO ---
 st.markdown(f'<div class="hero"><h1>🛡️ AI Policy Architect</h1><p>School of Computing, Data Sciences & Physics</p></div>', unsafe_allow_html=True)
 
 # --- INPUT SECTION ---
 st.markdown('<h2 class="section-header">📝 Assignment Context</h2>', unsafe_allow_html=True)
 
-# Course Info in a tight row
 c1, c2 = st.columns(2)
 with c1:
     class_name = st.text_input("Course Number (e.g., DATA 305)")
@@ -98,9 +101,7 @@ with c2:
     weight = st.text_input("Assignment Weight (%)")
 
 assignment_name = st.text_input("Assignment Title")
-
-# Full-width text areas for the "meat" of the prompt
-assignment_details = st.text_area("Detailed Prompt / Task Description", height=250, help="Paste the full assignment prompt here.")
+assignment_details = st.text_area("Detailed Prompt / Task Description", height=250)
 learning_objs = st.text_area("Learning Objectives & Grading Criteria", height=150)
 
 if st.button("Create Official Policy Memo"):
@@ -108,7 +109,6 @@ if st.button("Create Official Policy Memo"):
         st.error("Please provide at least the Course Number and Assignment Details.")
     else:
         with st.spinner("⚖️ Consulting William & Mary Academic Standards..."):
-            # Backend Logic
             embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
             db = Chroma(persist_directory="chroma_db", embedding_function=embeddings)
             search_query = f"{class_name} curriculum and William & Mary Honor Code"
@@ -124,12 +124,14 @@ if st.button("Create Official Policy Memo"):
 
             model = ChatGoogleGenerativeAI(model="gemini-flash-latest")
             response = model.invoke(prompt)
-            
-            # Extract content logic
-            if isinstance(response.content, list):
-                final_text = response.content[0].get('text', "")
-            else:
-                final_text = response.content
+            final_text = response.content
+
+            # --- LOG TO HISTORY ---
+            st.session_state.history.append({
+                "name": assignment_name if assignment_name else class_name,
+                "content": final_text,
+                "time": datetime.now().strftime("%I:%M %p")
+            })
 
             # --- THE REVEAL ---
             st.markdown('<h2 class="section-header">🏛️ Generated Policy Memo</h2>', unsafe_allow_html=True)
@@ -138,8 +140,6 @@ if st.button("Create Official Policy Memo"):
             st.markdown('</div>', unsafe_allow_html=True)
             
             st.download_button("💾 Download .txt for Syllabus", final_text, file_name=f"WM_{assignment_name}.txt")
-
-# Sidebar for History only
-with st.sidebar:
-    st.markdown("### 📜 Session History")
-    # History logic would go here if needed
+            
+            # This makes the sidebar update immediately
+            st.rerun()
