@@ -125,21 +125,29 @@ if st.button("Create Official Policy Memo"):
             model = ChatGoogleGenerativeAI(model="gemini-flash-latest")
             response = model.invoke(prompt)
             final_text = response.content
-
+            
             # --- LOG TO HISTORY ---
+            # Use str() to ensure it's a string, and .strip() to clean up whitespace
+            clean_text = str(final_text).strip()
+
             st.session_state.history.append({
                 "name": assignment_name if assignment_name else class_name,
-                "content": final_text,
+                "content": clean_text,
                 "time": datetime.now().strftime("%I:%M %p")
             })
 
             # --- THE REVEAL ---
             st.markdown('<h2 class="section-header">🏛️ Generated Policy Memo</h2>', unsafe_allow_html=True)
             st.markdown(f'<div class="policy-memo">', unsafe_allow_html=True)
-            st.markdown(final_text)
+            st.markdown(clean_text)
             st.markdown('</div>', unsafe_allow_html=True)
-            
-            st.download_button("💾 Download .txt for Syllabus", final_text, file_name=f"WM_{assignment_name}.txt")
-            
-            # This makes the sidebar update immediately
+
+            # Use the 'clean_text' variable here
+            st.download_button(
+                label="💾 Download .txt for Syllabus", 
+                data=clean_text, 
+                file_name=f"WM_{assignment_name}.txt",
+                mime="text/plain" # Explicitly tell Streamlit this is text
+            )
             st.rerun()
+            
