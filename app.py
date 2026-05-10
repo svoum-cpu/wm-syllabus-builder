@@ -77,16 +77,32 @@ st.markdown(f"""
 
 load_dotenv()
 
-# --- SIDEBAR (Rendered early so it stays visible) ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.markdown("### 📜 Session History")
+    
+    # Add a button to clear history if it gets messy
+    if st.button("Clear History"):
+        st.session_state.history = []
+        st.rerun()
+
     if not st.session_state.history:
         st.info("No policies generated yet.")
     else:
         for idx, item in enumerate(reversed(st.session_state.history)):
-            with st.expander(f"{item['time']} - {item['name']}"):
-                st.write(item['content'][:200] + "...")
-                st.download_button("Download This", item['content'], file_name=f"WM_{item['name']}.txt", key=f"dl_{idx}")
+            # We use .get() and str() to ensure we aren't displaying raw code
+            display_name = str(item.get('name', 'Untitled'))
+            display_content = str(item.get('content', 'No content'))
+            
+            with st.expander(f"{item.get('time', '')} - {display_name}"):
+                # This ensures the text looks clean in the sidebar
+                st.write(display_content[:200] + "...")
+                st.download_button(
+                    label="Download This", 
+                    data=display_content, 
+                    file_name=f"WM_{display_name}.txt", 
+                    key=f"sidebar_dl_{idx}"
+                )
 
 # --- HERO ---
 st.markdown(f'<div class="hero"><h1>🛡️ AI Policy Architect</h1><p>School of Computing, Data Sciences & Physics</p></div>', unsafe_allow_html=True)
